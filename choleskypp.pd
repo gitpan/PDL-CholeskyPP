@@ -1,0 +1,130 @@
+use version; our $VERSION = qv('0.0.2');
+use strict;
+use warnings;
+
+# pp_bless('PDL::CholeskyPP');
+
+# returns upper-triangle
+pp_def('cholesky',
+    Pars => 'input(n,n); [o] output(n,n)',
+    HandleBad => 1,
+    GenericTypes => [qw(D F)],
+    Code => q{
+        int i, j, k, l;
+        $GENERIC(output) tmp,  tmp_diag; 
+
+        for (j = 0; j < $SIZE(n); ++j){
+            tmp = $input(n0 => j, n1 => j);
+            for (k = 0; k <= j - 1; ++k){
+                tmp -= $output(n0 => j, n1 => k) * $output(n0 => j, n1 => k);
+            }
+
+            if (tmp <= 0){
+                for (k = 0; k < $SIZE(n); ++k){
+                    for (l = 0; l < $SIZE(n); ++l){
+                        $SETBAD(output(n0 => k, n1 => l));
+                    }
+                }
+                $PDLSTATESETBAD(output);
+                break;
+            }
+            tmp_diag = sqrt(tmp);
+            $output(n0 => j, n1 => j) = tmp_diag;
+
+            // zero under diagonal.
+            for (i = 0; i <= j - 1; ++i){
+                $output(n0 => i, n1 => j) = 0.0;
+            }
+
+            for (i = j + 1; i < $SIZE(n); ++i){
+                tmp = $input(n0 => i, n1 => j);
+                for (k = 0; k <= j - 1; ++k){
+                    tmp -= $output(n0 => i, n1 => k) * $output(n0 => j, n1 => k);
+                }
+                $output(n0 => i, n1 => j) = tmp / tmp_diag;
+            }
+        }
+    },
+);
+
+pp_addpm({At => 'Top'}, <<'POD');
+
+=head1 NAME
+
+PDL::CholeskyPP - PDL Cholesky Decomposition implemented in pdlpp without external dependencies.
+
+=head1 VERSION
+
+Version 0.0.2
+
+=head1 SYNOPSIS
+
+Cholesky decomposition decomposes a positive definite matrix A (any square
+matrix such that for all column vectors v, v->transpose() x A x v > 0) into a
+triangular matrix U such that U->transpose() x U = A.  It can be thought of as
+a matrix square root.
+
+This module implements the cholesky decomposition in pdlpp, without any
+external depencies like LAPACK or GSL.  It was written b/c there was no
+dependency-free implementation.
+
+    use PDL::CholeskyPP;
+
+    my $chol = $posdef->cholesky();
+
+=head1 EXPORT
+
+This module exports nothing.  cholesky() is added to the PDL:: namespace, so
+that you can call it on PDL objects.
+
+=head1 SUBROUTINES/METHODS
+
+=head2 cholesky( $input, [$output] )
+
+ Signature: (input(n,n); [o] output(n,n))
+
+Calculates the cholesky decomposition of a matrix and returns it as an
+upper-triangle matrix.
+
+ my $cd = $pdl->cholesky(); 
+ $pdl->cholesky($cd); 
+
+You can also call in a non-OO fashion:
+
+ my $cd = cholesky($input); 
+ cholesky($input, $cd); 
+
+If $input is not positive definite (ie, during the algorithm, an intermediate
+diagonal element is found to be non-positive), all elements of $output are set
+to BAD and $output->badflag() is set to true. 
+
+=head1 AUTHOR
+
+T. Nishimura, C<< <tnish at fastmail.jp> >>
+
+=head1 SUPPORT
+
+See:
+
+ perldoc PDL::CholeskyPP
+
+and: 
+
+ https://github.com/tnishimura/PDL-CholeskyPP
+ 
+=head1 LICENSE AND COPYRIGHT
+
+Copyright 2012 T. Nishimura.
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the GNU General Public License as published
+by the Free Software Foundation; or the Artistic License.
+
+See http://dev.perl.org/licenses/ for more information.
+
+=cut
+
+POD
+
+pp_done();
+
